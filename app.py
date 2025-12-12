@@ -1,3 +1,33 @@
+import subprocess
+import sys
+
+# Install spaCy models on Streamlit Cloud (runs once on deployment)
+def install_spacy_models():
+    try:
+        import spacy
+        # Check if models exist
+        try:
+            spacy.load("en_core_web_sm")
+        except:
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install",
+                "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1-py3-none-any.whl"
+            ])
+
+        try:
+            spacy.load("en_core_sci_sm")
+        except:
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install",
+                "https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_sm-0.5.1.tar.gz"
+            ])
+    except Exception as e:
+        print(f"[WARN] Could not install spaCy models: {e}")
+
+
+# Run on app startup.
+install_spacy_models()
+
 import os
 import sys
 import streamlit as st
