@@ -1,23 +1,33 @@
 import subprocess
 import sys
-
-# Install scispacy at runtime (avoids compilation issues)
-try:
-    import scispacy
-except:
-    subprocess.run([sys.executable, "-m", "pip", "install", "scispacy"], check=False)
-
-# Install sci model at runtime
-try:
-    import spacy
-    spacy.load("en_core_sci_sm")
-except:
-    subprocess.run([
-        sys.executable, "-m", "pip", "install",
-        "https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_sm-0.5.4.tar.gz"
-    ], check=False)
+import os
 
 
+# Install all models at runtime (works on Streamlit Cloud)
+def setup_dependencies():
+    """Install spaCy models and scispacy at runtime."""
+    try:
+        # Install spacy models using spacy's built-in downloader
+        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                       capture_output=True, check=False)
+
+        # Install scispacy
+        subprocess.run([sys.executable, "-m", "pip", "install", "scispacy"],
+                       capture_output=True, check=False)
+
+        # Install sci model
+        subprocess.run([
+            sys.executable, "-m", "pip", "install",
+            "https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_sm-0.5.4.tar.gz"
+        ], capture_output=True, check=False)
+
+        print("[INFO] ✅ Dependencies installed")
+    except Exception as e:
+        print(f"[WARN] Dependency setup: {e}")
+
+
+# Run setup on first import
+setup_dependencies()
 import os
 import sys
 import streamlit as st
