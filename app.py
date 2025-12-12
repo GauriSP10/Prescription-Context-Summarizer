@@ -41,7 +41,7 @@ import sys
 import streamlit as st
 
 st.set_page_config(
-    page_title="AI Prescription Context Summarizer – Multi-Model App",
+    page_title="AI Prescription Context Summarizer - Multi-Model App",
     layout="wide",
 )
 
@@ -62,8 +62,8 @@ st.sidebar.title("☰ Navigation")
 page = st.sidebar.radio(
     "Go to:",
     [
-        "Model 1 — TF-IDF + UMLS Correlation Summarizer",
-        "Model 2 — Abstractive Correlation Summarizer",
+        "Model 1 - TF-IDF + UMLS Correlation Summarizer",
+        "Model 2 - Abstractive Correlation Summarizer",
     ],
 )
 

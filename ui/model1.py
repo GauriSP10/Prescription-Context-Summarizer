@@ -91,8 +91,11 @@ def metric_row(metrics: dict):
 
 # ----------------- Main entry -----------------
 def render_model1_page():
-    st.title("Model 1 — TF-IDF + Rx Parser + UMLS Correlation")
+    st.title("Model 1 - TF-IDF + Rx Parser + UMLS Correlation")
     st.caption("Run analysis and evaluate history classifier performance.")
+    st.markdown(
+        "⚠️ **Disclaimer:** This is a research prototype. Outputs are model-generated and must not be used for real clinical decisions."
+    )
 
     tab_run, tab_eval = st.tabs(["🧠 Run", "📊 Evaluate"])
 
@@ -116,7 +119,7 @@ def render_model1_page():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("### Patient History Note")
+            st.markdown("### 📝 Patient History Note")
             uploaded_pdf = st.file_uploader("Upload history PDF (optional)", type=["pdf"], key="m1_pdf")
             if uploaded_pdf is not None:
                 with st.spinner("Extracting text from PDF..."):
@@ -131,7 +134,7 @@ def render_model1_page():
             st.session_state.history_note = note_text
 
         with col2:
-            st.markdown("### Prescription Text")
+            st.markdown("### 💊 Prescription Text")
             default_rx = (
                 "Sertraline 50 mg po once daily.\n"
                 "Clonazepam 0.5 mg at night prn.\n"
