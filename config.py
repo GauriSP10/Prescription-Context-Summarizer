@@ -2,15 +2,20 @@ import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
-# Load .env once at import time.
+# Load .env for local development.
 load_dotenv()
 
-# Mongo basics.
-MONGO_URI = os.getenv("MONGO_URI")
-if not MONGO_URI:
-    raise ValueError("MONGO_URI is not set in .env")
+# Try Streamlit secrets first (for deployment), fallback to .env (for local)
+try:
+    import streamlit as st
+    MONGO_URI = st.secrets.get("MONGO_URI", os.getenv("MONGO_URI"))
+    MONGO_DB_NAME = st.secrets.get("MONGO_DB_NAME", os.getenv("MONGO_DB_NAME", "patient_data"))
+except:
+    MONGO_URI = os.getenv("MONGO_URI")
+    MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "patient_data")
 
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "patient_data")
+if not MONGO_URI:
+    raise ValueError("MONGO_URI is not set in .env or Streamlit secrets")
 
 # Collection names.
 MONGO_COLL_TRAIN = os.getenv("MONGO_COLL_TRAIN", "train")
@@ -21,8 +26,6 @@ MONGO_COLL_NBME_FEATURES = os.getenv("MONGO_COLL_NBME_FEATURES", "nbme_features"
 
 # Data directory.
 DATA_DIR = os.getenv("DATA_DIR", "./data")
-
-# Makes sure that the data directory exists.
 os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_mongo_client() -> MongoClient:
