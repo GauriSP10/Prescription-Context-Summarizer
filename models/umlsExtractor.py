@@ -97,6 +97,7 @@ def _build_nlp():
 
 # Extract UMLS-linked biomedical concepts.
 def extract_umls_concepts(text: str) -> Dict[str, Any]:
+    """Extract UMLS-linked biomedical concepts, filtering out generic ENTITY labels."""
     if not text or not text.strip():
         return {"concepts": [], "semantic_type_counts": {}}
 
@@ -109,6 +110,10 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
     global _linker
 
     for ent in doc.ents:
+        # Skip generic ENTITY labels - they're not informative
+        if ent.label_ == "ENTITY":
+            continue
+
         if _linker and hasattr(ent._, "kb_ents") and ent._.kb_ents:
             try:
                 cui, score = ent._.kb_ents[0]
@@ -129,7 +134,8 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
             except (KeyError, AttributeError, IndexError):
                 pass
         else:
-            if ent.label_:
+            # Only add if it has a meaningful label
+            if ent.label_ and ent.label_ != "ENTITY":
                 concepts.append({
                     "text": ent.text,
                     "label": ent.label_,
@@ -264,16 +270,19 @@ UMLS_SEMANTIC_TYPE_LABELS = {
 
 # Convert UMLS semantic types to readable summary.
 def summarize_semantic_types(semantic_type_counts: Dict[str, int]) -> str:
-    if not semantic_type_counts:
-        return "not strongly associated with any specific biomedical semantic category"
+    """Convert UMLS semantic types to readable summary."""
+    # Filter out ENTITY labels
+    filtered_counts = {k: v for k, v in semantic_type_counts.items() if k != "ENTITY"}
+
+    if not filtered_counts:
+        return "containing general medical terminology without strongly typed biomedical concepts"
 
     sorted_types = sorted(
-        semantic_type_counts.items(), key=lambda x: x[1], reverse=True
+        filtered_counts.items(), key=lambda x: x[1], reverse=True
     )[:3]
 
     parts = []
     for sem_type, count in sorted_types:
-        # Get readable label, fallback to code if not found
         label = UMLS_SEMANTIC_TYPE_LABELS.get(sem_type, sem_type)
         parts.append(f"{label} ({count})")
 
