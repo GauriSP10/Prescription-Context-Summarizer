@@ -93,6 +93,19 @@ def metric_row(metrics: dict):
 def render_model1_page():
     st.title("Model 1 - TF-IDF + Rx Parser + UMLS Correlation")
     st.caption("Run analysis and evaluate history classifier performance.")
+    st.markdown("""
+    <div style="
+        padding: 12px 16px;
+        border-left: 4px solid #4da3ff;
+        margin-bottom: 12px;
+        color: #fafafa;
+        font-size: 0.95rem;
+    ">
+    <strong>Project Overview</strong><br>
+    This prototype leverages transformer-based language models and clinical NLP pipelines to extract, correlate, and summarize information from patient–doctor notes over time. The system is intended for experimental evaluation of medical text understanding and inference.
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown(
         "⚠️ **Disclaimer:** This is a research prototype. Outputs are model-generated and must not be used for real clinical decisions."
     )
