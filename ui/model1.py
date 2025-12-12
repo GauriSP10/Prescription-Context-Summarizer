@@ -15,7 +15,7 @@ import os
 
 load_dotenv()
 
-# ----------------- Paths (Streamlit Cloud safe) -----------------
+# Paths.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.getenv("DATA_DIR", str(REPO_ROOT / "data")))
 MODELS_DIR = Path(os.getenv("MODELS_DIR", str(REPO_ROOT / "models")))
@@ -24,7 +24,7 @@ DEFAULT_MODEL_PATH = Path(os.getenv("HISTORY_MODEL_PATH", str(MODELS_DIR / "hist
 DEFAULT_MLB_PATH = Path(os.getenv("HISTORY_MLB_PATH", str(MODELS_DIR / "history_labels_mlb.joblib")))
 DEFAULT_DATA_PATH = Path(os.getenv("HISTORY_DATA_PATH", str(DATA_DIR / "nbme_summarization_dataset.csv")))
 
-# ----------------- Mongo (cached) -----------------
+# Mongo.
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "patient_data")
 FEEDBACK_COLL = os.getenv("MONGO_COLL_FEEDBACK", "history_rx_feedback")
@@ -32,12 +32,20 @@ FEEDBACK_COLL = os.getenv("MONGO_COLL_FEEDBACK", "history_rx_feedback")
 
 @st.cache_resource
 def get_mongo_client():
+    """
+    Create cached MongoDB client singleton for feedback storage across app sessions.
+    Input: None | Output: MongoClient instance or None if MONGO_URI not configured
+    """
     if not MONGO_URI:
         return None
     return MongoClient(MONGO_URI)
 
 
 def get_feedback_collection():
+    """
+    Retrieve MongoDB feedback collection for storing user feedback on model predictions.
+    Input: None | Output: MongoDB collection object or None if client unavailable
+    """
     client = get_mongo_client()
     if client is None:
         return None
@@ -45,6 +53,10 @@ def get_feedback_collection():
 
 
 def log_feedback(note_text, prescription_text, result, useful: bool, comments: str | None):
+    """
+    Store user feedback on model predictions to MongoDB for future model improvement.
+    Input: note_text (str), prescription_text (str), result (dict), useful (bool), comments (str|None) | Output: None
+    """
     coll = get_feedback_collection()
     if coll is None:
         return
@@ -62,8 +74,11 @@ def log_feedback(note_text, prescription_text, result, useful: bool, comments: s
     )
 
 
-# ----------------- PDF → TEXT -----------------
 def extract_text_from_pdf(uploaded_file) -> str:
+    """
+    Extract text content from uploaded PDF file using PyPDF2 (works for text-based PDFs, not scanned images).
+    Input: uploaded_file (Streamlit UploadedFile object) | Output: str - extracted text or empty string if extraction fails
+    """
     try:
         reader = PyPDF2.PdfReader(uploaded_file)
     except Exception:
@@ -80,8 +95,11 @@ def extract_text_from_pdf(uploaded_file) -> str:
     return "\n\n".join(texts).strip()
 
 
-# ----------------- UI helpers -----------------
 def metric_row(metrics: dict):
+    """
+    Display model performance metrics in a 4-column row layout for quick visualization.
+    Input: metrics (dict) with micro_f1, macro_f1, jaccard, hamming_score keys | Output: None (renders Streamlit UI)
+    """
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Micro F1", f"{metrics.get('micro_f1', 0):.3f}")
     c2.metric("Macro F1", f"{metrics.get('macro_f1', 0):.3f}")
@@ -89,8 +107,11 @@ def metric_row(metrics: dict):
     c4.metric("Hamming Score", f"{metrics.get('hamming_score', 0):.3f}")
 
 
-# ----------------- Main entry -----------------
 def render_model1_page():
+    """
+    Render Model 1 Streamlit page with two tabs: Run (correlation analysis) and Evaluate (model performance metrics/charts).
+    Input: None | Output: None (renders complete Streamlit page with analysis pipeline and evaluation dashboard)
+    """
     st.title("Model 1 - TF-IDF + Rx Parser + UMLS Correlation")
     st.caption("Run analysis and evaluate history classifier performance.")
     st.markdown("""
@@ -112,9 +133,7 @@ def render_model1_page():
 
     tab_run, tab_eval = st.tabs(["🧠 Run", "📊 Evaluate"])
 
-    # =========================
     # TAB: RUN
-    # =========================
     with tab_run:
         st.subheader("Run Correlation Pipeline")
 
@@ -141,7 +160,7 @@ def render_model1_page():
                     st.session_state.history_note = txt
                     st.success("Loaded extracted text into the editor.")
                 else:
-                    st.warning("No text extracted (scanned PDFs won’t work with PyPDF2).")
+                    st.warning("No text extracted (scanned PDFs won't work with PyPDF2).")
 
             note_text = st.text_area("History Note", value=st.session_state.history_note, height=260)
             st.session_state.history_note = note_text
@@ -219,9 +238,7 @@ def render_model1_page():
                     )
                     st.toast("Feedback saved ✅", icon="✅")
 
-    # =========================
     # TAB: EVAL
-    # =========================
     with tab_eval:
         st.subheader("Evaluation Dashboard (History Classifier)")
         st.caption("Metrics + threshold sweep + label maps.")

@@ -13,6 +13,10 @@ from config import (
 
 # Load all documents from a MongoDB collection into a pandas DataFrame, excluding the _id field.
 def load_collection_as_df(db, collection_name: str) -> pd.DataFrame:
+    """
+    Load all documents from a MongoDB collection into a pandas DataFrame (dropping MongoDB _id field).
+    Input: db (MongoDB database), collection_name (str) | Output: pd.DataFrame of documents (empty if collection has no docs)
+    """
     coll = db[collection_name]
     docs = list(coll.find({}))
     if not docs:
@@ -27,6 +31,10 @@ def load_collection_as_df(db, collection_name: str) -> pd.DataFrame:
 
 # Write a pandas DataFrame to MongoDB collection, optionally clearing existing documents before insertion.
 def write_df_to_mongo(df: pd.DataFrame, db, collection_name: str, clear_existing: bool = True):
+    """
+    Write a pandas DataFrame into a MongoDB collection (optionally clearing existing documents first).
+    Input: df (pd.DataFrame), db (MongoDB database), collection_name (str), clear_existing (bool) | Output: None
+    """
     coll = db[collection_name]
     if clear_existing:
         coll.delete_many({})
@@ -43,6 +51,10 @@ def write_df_to_mongo(df: pd.DataFrame, db, collection_name: str, clear_existing
 #  Merge NBME tables and construct a summarization dataset by aggregating positive feature annotations
 #  per patient note into semicolon-separated summary strings for model training.
 def build_summarization_dataset(train_df, features_df, notes_df) -> pd.DataFrame:
+    """
+    Build NBME summarization dataset by merging train/features/notes and aggregating positive feature_text per note.
+    Input: train_df (pd.DataFrame), features_df (pd.DataFrame), notes_df (pd.DataFrame) | Output: pd.DataFrame with columns [case_num, pn_num, note_text, summary]
+    """
     required_train_cols = {"case_num", "pn_num", "feature_num", "annotation"}
     required_feat_cols = {"case_num", "feature_num", "feature_text"}
     required_note_cols = {"case_num", "pn_num", "pn_history"}
@@ -84,6 +96,10 @@ def build_summarization_dataset(train_df, features_df, notes_df) -> pd.DataFrame
 
 
 def build_feature_vocab(features_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build a unique, sorted vocabulary of feature_text values from NBME features table for label space reference.
+    Input: features_df (pd.DataFrame) | Output: pd.DataFrame with a single column [feature_text]
+    """
     if "feature_text" not in features_df.columns:
         raise ValueError("'feature_text' column missing in features_df")
 

@@ -8,13 +8,13 @@ OUT_DIR = os.path.join("vendor_models", MODEL_NAME)
 def main():
     nlp = spacy.load(MODEL_NAME)
 
-    # Make sure output dir is clean
+    # Make sure output dir is clean.
     if os.path.exists(OUT_DIR):
         shutil.rmtree(OUT_DIR)
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    # Save the model to your repo folder
+    # Save the model to the repo folder.
     nlp.to_disk(OUT_DIR)
 
     print(f"[DONE] Saved {MODEL_NAME} to: {OUT_DIR}")

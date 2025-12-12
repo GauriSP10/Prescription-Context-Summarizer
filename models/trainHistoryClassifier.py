@@ -21,8 +21,12 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 DATA_PATH = os.path.join(DATA_DIR, "nbme_summarization_dataset.csv")
 
-# Load preprocessed NBME summarization dataset from CSV and ensure text columns are properly typed as strings.
+
 def load_data():
+    """
+    Load preprocessed NBME dataset from CSV with note_text and summary columns.
+    Input: None | Output: pandas DataFrame with 'note_text' and 'summary' columns
+    """
     if not os.path.exists(DATA_PATH):
         raise FileNotFoundError(f"{DATA_PATH} not found. Did you run preprocessing?")
     df = pd.read_csv(DATA_PATH)
@@ -31,10 +35,12 @@ def load_data():
     df["summary"] = df["summary"].astype(str)
     return df
 
-#     Convert 'summary' column like:
-#       'feature1; feature2; feature3'
-#     into list-of-labels for MultiLabelBinarizer.
+
 def build_labels(df):
+    """
+    Convert semicolon-separated summary strings into multi-label binary matrix using MultiLabelBinarizer.
+    Input: df (DataFrame) with 'summary' column | Output: Tuple of (Y: binary matrix, mlb: MultiLabelBinarizer)
+    """
     label_sets = df["summary"].apply(
         lambda s: [x.strip() for x in s.split(";") if x.strip()]
     ).tolist()
@@ -44,9 +50,12 @@ def build_labels(df):
     print(f"[INFO] Number of unique labels (features): {len(mlb.classes_)}")
     return Y, mlb
 
-#  Main training pipeline: loads NBME data, builds multi-label targets, trains TF-IDF+SVD+LogReg classifier,
-#     evaluates performance, and saves the trained model artifacts to disk.
+
 if __name__ == "__main__":
+    """
+    Training script: loads data, builds TF-IDF+SVD+LogisticRegression pipeline, trains on NBME notes, evaluates, and saves model.
+    Input: None | Output: Saves history_classifier.joblib and history_labels_mlb.joblib to models/ directory
+    """
     print("[INFO] Loading data...")
     df = load_data()
     X = df["note_text"].tolist()
@@ -86,15 +95,4 @@ if __name__ == "__main__":
     text_clf.fit(X_train, Y_train)
 
     print("[INFO] Evaluating on validation set...")
-    Y_val_pred = text_clf.predict(X_val)
-    print(classification_report(Y_val, Y_val_pred, zero_division=0))
-
-    # Save everything: pipeline + label binarizer.
-    model_path = os.path.join(MODEL_DIR, "history_classifier.joblib")
-    mlb_path = os.path.join(MODEL_DIR, "history_labels_mlb.joblib")
-
-    joblib.dump(text_clf, model_path)
-    joblib.dump(mlb, mlb_path)
-
-    print(f"[DONE] Saved model pipeline to: {model_path}")
-    print(f"[DONE] Saved label binarizer to: {mlb_path}")
+    Y_val

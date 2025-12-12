@@ -15,6 +15,10 @@ from sklearn.metrics import (
 
 
 def _load_dataset_csv(data_path: str) -> Tuple[List[str], List[List[str]]]:
+    """
+    Load NBME dataset from CSV and parse into text inputs and multi-label targets.
+    Input: data_path (str) | Output: Tuple of (texts: List[str], label_sets: List[List[str]])
+    """
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Dataset not found: {data_path}")
 
@@ -31,13 +35,21 @@ def _load_dataset_csv(data_path: str) -> Tuple[List[str], List[List[str]]]:
 
 
 def _stack_proba(prob_list) -> np.ndarray:
-    # If OneVsRest gives list of (n_samples,2) probs per label
+    """
+    Convert OneVsRest probability list into stacked array for thresholding.
+    Input: prob_list (list of arrays or ndarray) | Output: ndarray of shape (n_samples, n_labels)
+    """
+    # If OneVsRest gives list of (n_samples,2) probs per label.
     if isinstance(prob_list, list):
         return np.vstack([p[:, 1] for p in prob_list]).T
     return prob_list  # already (n_samples, n_labels)
 
 
 def _compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    """
+    Calculate multi-label classification metrics: micro/macro F1, Jaccard, and Hamming score.
+    Input: y_true (ndarray), y_pred (ndarray) | Output: Dict with micro_f1, macro_f1, jaccard, hamming_score
+    """
     micro = f1_score(y_true, y_pred, average="micro", zero_division=0)
     macro = f1_score(y_true, y_pred, average="macro", zero_division=0)
     jacc = jaccard_score(y_true, y_pred, average="samples", zero_division=0)
@@ -53,7 +65,8 @@ def _compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]
 
 def _label_cooccurrence(Y: np.ndarray, max_labels: int = 30) -> Tuple[np.ndarray, List[int]]:
     """
-    Returns co-occurrence matrix for top-N labels by frequency.
+    Compute co-occurrence matrix for top-N most frequent labels to visualize feature relationships.
+    Input: Y (ndarray), max_labels (int) | Output: Tuple of (cooc_matrix: ndarray, top_label_indices: List[int])
     """
     freq = Y.sum(axis=0)
     top_idx = np.argsort(freq)[::-1][:max_labels]
@@ -73,6 +86,10 @@ def evaluate_history_classifier(
     random_state: int = 42,
     top_labels_for_heatmap: int = 30,
 ) -> Dict[str, Any]:
+    """
+    Comprehensive evaluation of trained history classifier including threshold sweep, per-label stats, and co-occurrence analysis.
+    Input: data_path, model_path, mlb_path, threshold, sweep parameters | Output: Dict with metrics, sweep results, label stats, and heatmap data
+    """
     # Load dataset
     texts, label_sets = _load_dataset_csv(data_path)
 

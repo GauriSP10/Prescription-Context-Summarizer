@@ -11,9 +11,13 @@ MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "patient_data")
 FEEDBACK_COLL = os.getenv("MONGO_COLL_FEEDBACK", "history_rx_feedback")
 
-# Create a single MongoClient instance cached by Streamlit.
+
 @st.cache_resource
 def get_mongo_client():
+    """
+    Create and cache a MongoDB client for the Streamlit application.
+    Input: None (uses MONGO_URI from environment variables) | Output: MongoClient instance or None
+    """
     if not MONGO_URI:
         return None
     try:
@@ -23,16 +27,25 @@ def get_mongo_client():
         st.sidebar.error(f"Mongo connection error: {e}")
         return None
 
-# Get the feedback collection from MongoDB.
+
 def get_feedback_collection():
+    """
+    Retrieve the MongoDB collection used to store user feedback.
+    Input: None | Output: pymongo Collection object or None
+    """
     client = get_mongo_client()
     if client is None:
         return None
     db = client[MONGO_DB_NAME]
     return db[FEEDBACK_COLL]
 
-# Log user feedback to MongoDB.
+
 def log_feedback(note_text: str, prescription_text: str, result: dict, useful: bool, comments: str | None):
+    """
+    Log user feedback for history–prescription correlation results to MongoDB.
+    Input: note_text (str), prescription_text (str), result (dict), useful (bool), comments (str | None)
+    Output: None (writes feedback document to MongoDB)
+    """
     coll = get_feedback_collection()
     if coll is None:
         return
@@ -49,8 +62,12 @@ def log_feedback(note_text: str, prescription_text: str, result: dict, useful: b
     }
     coll.insert_one(doc)
 
-# Extract text from a PDF uploaded via Streamlit.
+
 def extract_text_from_pdf(uploaded_file) -> str:
+    """
+    Extract raw text content from an uploaded PDF file for downstream NLP processing.
+    Input: uploaded_file (Streamlit UploadedFile) | Output: Extracted text as a single string
+    """
     try:
         reader = PyPDF2.PdfReader(uploaded_file)
     except Exception:

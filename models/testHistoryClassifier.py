@@ -14,8 +14,12 @@ DATA_PATH = os.path.join(DATA_DIR, "nbme_summarization_dataset.csv")
 MODEL_PATH = os.path.join(MODEL_DIR, "history_classifier.joblib")
 MLB_PATH = os.path.join(MODEL_DIR, "history_labels_mlb.joblib")
 
-# Randomly sample one patient note with ground-truth summary from the NBME dataset for model testing.
+
 def load_random_example():
+    """
+    Randomly sample one patient note with ground-truth summary from NBME dataset for testing.
+    Input: None | Output: pandas Series with 'note_text' and 'summary' columns
+    """
     if not os.path.exists(DATA_PATH):
         raise FileNotFoundError(f"{DATA_PATH} not found.")
     df = pd.read_csv(DATA_PATH)
@@ -23,8 +27,12 @@ def load_random_example():
     df["summary"] = df["summary"].astype(str)
     return df.sample(n=1, random_state=random.randint(0, 99999)).iloc[0]
 
-# Load the trained history classifier pipeline and MultiLabelBinarizer from disk for inference/testing.
+
 def load_model_and_mlb():
+    """
+    Load trained classifier pipeline and label binarizer from disk for inference/testing.
+    Input: None | Output: Tuple of (classifier: Pipeline, mlb: MultiLabelBinarizer)
+    """
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"{MODEL_PATH} not found. Train the model first.")
     if not os.path.exists(MLB_PATH):
@@ -33,8 +41,12 @@ def load_model_and_mlb():
     mlb = joblib.load(MLB_PATH)
     return clf, mlb
 
-# Main execution: load random example, run trained classifier, and compare predicted features against ground truth.
+
 if __name__ == "__main__":
+    """
+    Test script: loads random note, runs classifier, displays predicted vs true features for model validation.
+    Input: None | Output: Prints note text, ground truth summary, and predicted features to console
+    """
     example = load_random_example()
     note_text = example["note_text"]
     true_summary = example["summary"]

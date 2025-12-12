@@ -9,57 +9,52 @@ _nlp = None
 _linker = None
 
 
-# Register the UMLS linker as a spaCy component.
 @Language.factory("umls_linker")
 def create_umls_linker(nlp, name):
-    """Factory function to create UMLS linker component."""
-    # scispaCy registers the built-in component factory as "entity_linker".
-    # We keep our custom factory name, but instantiate via the supported spaCy add_pipe approach
-    # to avoid E002/E966 factory issues.
+    """
+    Factory function to create UMLS EntityLinker component for spaCy pipeline.
+    Input: nlp (spacy.Language), name (str) | Output: EntityLinker instance with UMLS knowledge base
+    """
     try:
         import scispacy  # noqa: F401
         from scispacy.linking import EntityLinker  # noqa: F401
     except Exception as e:
         raise RuntimeError(f"scispacy is not available: {e}")
 
-    # Create and return an EntityLinker instance
     return EntityLinker(
         resolve_abbreviations=True,
         name=name,
         threshold=0.7
     )
 
-# Load spaCy model and add UMLS linker.
+
 def _build_nlp():
-    """Load spaCy model from vendor_models directory (bundled with repo)."""
+    """
+    Load SciSpaCy biomedical NER model (from vendor_models or system) and attach UMLS entity linker.
+    Input: None | Output: spacy.Language pipeline with NER and UMLS linking components
+    """
     global _nlp, _linker
 
     if _nlp is not None:
         return _nlp
 
-    # Define path to vendored model.
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     VENDOR_MODEL_PATH = os.path.join(BASE_DIR, "vendor_models", "en_core_sci_sm")
 
-    # Try loading from vendor_models first.
     try:
         if os.path.exists(VENDOR_MODEL_PATH):
             nlp = spacy.load(VENDOR_MODEL_PATH)
             print(f"[INFO] Loaded en_core_sci_sm from vendor_models/")
         else:
-            # Fallback to installed model.
             nlp = spacy.load("en_core_sci_sm")
             print("[INFO] Loaded en_core_sci_sm from system")
     except OSError:
-        # Final fallback to web model.
         nlp = spacy.load("en_core_web_sm")
         print("[INFO] Loaded en_core_web_sm (fallback)")
 
-    # Add sentencizer.
     if ("sentencizer" not in nlp.pipe_names) and ("parser" not in nlp.pipe_names):
         nlp.add_pipe("sentencizer", first=True)
 
-    # Add UMLS linker.
     try:
         print("[INFO] Initializing UMLS linker...")
 
@@ -94,9 +89,12 @@ def _build_nlp():
     _nlp = nlp
     return nlp
 
-# Extract UMLS-linked biomedical concepts.
+
 def extract_umls_concepts(text: str) -> Dict[str, Any]:
-    """Extract UMLS-linked biomedical concepts, filtering out generic ENTITY labels."""
+    """
+    Extract biomedical entities with UMLS CUI codes and semantic types, filtering out generic ENTITY labels.
+    Input: text (str) - clinical text | Output: Dict with 'concepts' (list) and 'semantic_type_counts' (dict)
+    """
     if not text or not text.strip():
         return {"concepts": [], "semantic_type_counts": {}}
 
@@ -109,7 +107,6 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
     global _linker
 
     for ent in doc.ents:
-        # Skip generic ENTITY labels because they're not informative.
         if ent.label_ == "ENTITY":
             continue
 
@@ -133,7 +130,6 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
             except (KeyError, AttributeError, IndexError):
                 pass
         else:
-            # Only add if it has a meaningful label.
             if ent.label_ and ent.label_ != "ENTITY":
                 concepts.append({
                     "text": ent.text,
@@ -151,16 +147,13 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
     }
 
 
-# Complete UMLS Semantic Type labels.
+# UMLS Semantic Type labels mapping T-codes to human-readable descriptions.
 UMLS_SEMANTIC_TYPE_LABELS = {
-    # Organisms.
     "T001": "Organism",
     "T002": "Plant",
     "T004": "Fungus",
     "T005": "Virus",
     "T007": "Bacterium",
-
-    # Anatomical Structures.
     "T017": "Anatomical Structure",
     "T021": "Fully Formed Anatomical Structure",
     "T022": "Body System",
@@ -170,8 +163,6 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T026": "Cell Component",
     "T029": "Body Location or Region",
     "T030": "Body Space or Junction",
-
-    # Biological Function.
     "T032": "Organism Function",
     "T033": "Finding (Clinical findings)",
     "T034": "Laboratory or Test Result",
@@ -184,8 +175,6 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T043": "Cell Function",
     "T044": "Molecular Function",
     "T045": "Genetic Function",
-
-    # Chemicals & Drugs.
     "T103": "Chemical",
     "T109": "Organic Chemical",
     "T110": "Steroid",
@@ -204,8 +193,6 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T196": "Element, Ion, or Isotope",
     "T197": "Inorganic Chemical",
     "T200": "Clinical Drug",
-
-    # Disorders.
     "T019": "Congenital Abnormality",
     "T020": "Acquired Abnormality",
     "T046": "Pathologic Function",
@@ -216,23 +203,15 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T184": "Sign or Symptom",
     "T190": "Anatomical Abnormality",
     "T191": "Neoplastic Process",
-
-    # Procedures.
     "T058": "Health Care Activity",
     "T059": "Laboratory Procedure",
     "T060": "Diagnostic Procedure",
     "T061": "Therapeutic or Preventive Procedure",
-
-    # Devices.
     "T074": "Medical Device",
     "T075": "Research Device",
-
-    # Objects.
     "T071": "Entity",
     "T072": "Physical Object",
     "T073": "Manufactured Object",
-
-    # Concepts & Ideas.
     "T077": "Conceptual Entity",
     "T078": "Idea or Concept",
     "T079": "Temporal Concept (Time-related)",
@@ -242,16 +221,12 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T089": "Regulation or Law",
     "T090": "Occupation or Discipline",
     "T091": "Biomedical Occupation or Discipline",
-
-    # Activities & Behaviors.
     "T052": "Activity",
     "T053": "Behavior",
     "T054": "Social Behavior",
     "T055": "Individual Behavior",
     "T056": "Daily or Recreational Activity",
     "T057": "Occupational Activity",
-
-    # Organizations & Groups.
     "T092": "Organization",
     "T093": "Health Care Related Organization",
     "T094": "Professional Society",
@@ -262,15 +237,15 @@ UMLS_SEMANTIC_TYPE_LABELS = {
     "T099": "Family Group",
     "T100": "Age Group",
     "T101": "Patient or Disabled Group",
-
-    # Geographic Areas.
     "T083": "Geographic Area",
 }
 
-# Convert UMLS semantic types to readable summary.
+
 def summarize_semantic_types(semantic_type_counts: Dict[str, int]) -> str:
-    """Convert UMLS semantic types to readable summary."""
-    # Filter out ENTITY labels.
+    """
+    Convert UMLS semantic type codes to human-readable summary of top 3 categories.
+    Input: semantic_type_counts (Dict[str, int]) - type code frequencies | Output: str - readable summary phrase
+    """
     filtered_counts = {k: v for k, v in semantic_type_counts.items() if k != "ENTITY"}
 
     if not filtered_counts:

@@ -2,9 +2,13 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
-# Structured representation of a parsed prescription with extracted medication details (drug name, strength, dosage, route, frequency, duration).
+
 @dataclass
 class PrescriptionEntry:
+    """
+    Structured representation of a parsed prescription with extracted medication details.
+    Fields: raw, drug, strength, dosage, form, route, frequency, duration (all Optional[str] except raw)
+    """
     raw: str
     drug: Optional[str] = None
     strength: Optional[str] = None
@@ -14,8 +18,12 @@ class PrescriptionEntry:
     frequency: Optional[str] = None
     duration: Optional[str] = None
 
-# Parse prescription using pattern matching.
+
 def parse_prescription_text_ml(text: str) -> List[PrescriptionEntry]:
+    """
+    Parse prescription text using regex patterns to extract drug names, dosages, routes, frequencies, and durations.
+    Input: text (str) - raw prescription text | Output: List[PrescriptionEntry] - structured medication entries
+    """
     if not text or not text.strip():
         return []
 

@@ -9,21 +9,19 @@ from config import (
     MONGO_COLL_PATIENT_NOTES,
 )
 
-
-# ---------------------------
 # CENTRALIZED FILE → COLLECTION MAPPING
-# ---------------------------
 UPLOAD_TARGETS = {
     "train.csv": MONGO_COLL_TRAIN,
     "features.csv": MONGO_COLL_FEATURES,
     "patient_notes.csv": MONGO_COLL_PATIENT_NOTES,
 }
 
-
-# ---------------------------
 # CSV UPLOAD HELPER
-# ---------------------------
 def upload_csv_to_collection(db, csv_path: str, collection_name: str, clear_existing: bool = True):
+    """
+    Ingest a CSV file and upload its rows as documents into a target MongoDB collection.
+    Input: db (MongoDB database), csv_path (str), collection_name (str), clear_existing (bool) | Output: None
+    """
     """
     Reads a CSV file, converts to documents, and uploads to a MongoDB collection.
     """
@@ -48,10 +46,12 @@ def upload_csv_to_collection(db, csv_path: str, collection_name: str, clear_exis
         print(f"[WARN] No rows found in {csv_path} — nothing inserted.")
 
 
-# ---------------------------
 # MAIN INGESTION PIPELINE
-# ---------------------------
 def upload_all_csvs():
+    """
+    Upload all required NBME CSV files into their configured MongoDB collections using UPLOAD_TARGETS mapping.
+    Input: None | Output: None
+    """
     """
     Walks through UPLOAD_TARGETS and uploads all required CSVs
     into their configured MongoDB collections.
@@ -71,8 +71,6 @@ def upload_all_csvs():
     print("\n[DONE] All dataset uploads complete.")
 
 
-# ---------------------------
 # RUN SCRIPT
-# ---------------------------
 if __name__ == "__main__":
     upload_all_csvs()

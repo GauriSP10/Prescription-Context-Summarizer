@@ -5,9 +5,13 @@ from historyInference import predict_history_features
 from prescriptionParser import parse_prescription_text_ml, PrescriptionEntry
 from umlsExtractor import extract_umls_concepts, summarize_semantic_types
 
-# Generate UMLS-based semantic insights by comparing biomedical concepts extracted from
-# patient history and prescription texts using the Unified Medical Language System ontology.
+
 def correlate_umls(history_text: str, prescription_text: str) -> Dict[str, Any]:
+    """
+    Performs UMLS semantic analysis on patient history and prescription texts to identify therapeutic alignment,
+    shared medical concepts, and regimen complexity. Returns semantic profiles and clinical insights.
+    Input: history_text (str), prescription_text (str) | Output: Dict with UMLS concepts, semantic types, and insights
+    """
     try:
         # Extract UMLS concepts and semantic types from both texts.
         hist_umls = extract_umls_concepts(history_text)
@@ -87,12 +91,9 @@ def correlate_history_and_prescription(
         top_k: int | None = None,
 ) -> Dict[str, Any]:
     """
-    Comprehensive correlation pipeline that combines:
-    1. NBME-trained multi-label classifier for structured feature extraction
-    2. Pattern-based prescription parsing for medication details
-    3. UMLS semantic analysis for knowledge-grounded clinical insights
-
-    Returns a unified analysis linking patient history to prescribed medications.
+    Main correlation pipeline combining NBME classifier, prescription parser, and UMLS semantic analysis.
+    Input: note_text (str), prescription_text (str), threshold (float), top_k (int|None)
+    Output: Dict with history_features (list), prescriptions (list), UMLS data (dict), and insights (list)
     """
 
     # 1. Extract structured clinical features using trained NBME classifier.

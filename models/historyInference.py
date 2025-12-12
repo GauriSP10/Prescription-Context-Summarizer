@@ -11,8 +11,12 @@ MODEL_DIR = os.path.join(PROJECT_ROOT, "models")
 MODEL_PATH = os.path.join(MODEL_DIR, "history_classifier.joblib")
 MLB_PATH = os.path.join(MODEL_DIR, "history_labels_mlb.joblib")
 
-# Load the trained history classification model and label binarizer from disk.
+
 def load_history_model():
+    """
+    Load trained TF-IDF+SVD+LogisticRegression pipeline and MultiLabelBinarizer from disk for inference.
+    Input: None | Output: Tuple of (classifier: Pipeline, label_binarizer: MultiLabelBinarizer)
+    """
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"History model not found at {MODEL_PATH}")
     if not os.path.exists(MLB_PATH):
@@ -21,15 +25,15 @@ def load_history_model():
     mlb = joblib.load(MLB_PATH)
     return clf, mlb
 
-# Given a raw patient note, returns a list of predicted feature labels.
+
 def predict_history_features(
     note_text: str,
     threshold: float = 0.3,
     top_k: int | None = None,
 ):
     """
-    - Uses predict_proba, then thresholds per-label.
-    - If top_k is provided, returns at most top_k labels by probability.
+    Predict clinical feature labels from patient note using probability thresholding and optional top-K selection.
+    Input: note_text (str), threshold (float), top_k (int|None) | Output: List[str] of predicted feature labels
     """
     clf, mlb = load_history_model()
 

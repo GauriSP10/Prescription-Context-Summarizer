@@ -15,12 +15,18 @@ from models.utils import get_statistics, get_example_notes
 
 @st.cache_resource
 def load_model(model_name='t5-small'):
-    """Load model (cached so it only loads once)"""
+    """
+    Load and cache T5 transformer model for abstractive summarization (runs once per session).
+    Input: model_name (str) - 't5-small' or 't5-base' | Output: ClinicalNoteSummarizer instance
+    """
     return ClinicalNoteSummarizer(model_name=model_name)
 
 
 def render_model2_page():
-    """Render T5 Abstractive Summarizer page."""
+    """
+    Render Model 2 Streamlit page with T5 abstractive summarizer including input/output panels, example notes, and download functionality.
+    Input: None | Output: None (renders complete Streamlit page with T5 summarization interface)
+    """
 
     st.title("🤖 Clinical Note Summarizer")
     st.markdown("### Automated abstractive summarization using T5 transformer")
