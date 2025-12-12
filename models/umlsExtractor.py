@@ -1,0 +1,243 @@
+from collections import Counter
+from typing import Any, Dict, List
+import spacy
+from spacy.language import Language
+import warnings
+
+_nlp = None
+_linker = None
+
+
+# Register the UMLS linker as a spaCy component.
+@Language.factory("umls_linker")
+def create_umls_linker(nlp, name):
+    """Factory function to create UMLS linker component."""
+    from scispacy.linking import EntityLinker
+    return EntityLinker(
+        resolve_abbreviations=True,
+        name=name,
+        threshold=0.7
+    )
+
+# Load spaCy model and add UMLS linker.
+def _build_nlp():
+    global _nlp, _linker
+
+    if _nlp is not None:
+        return _nlp
+
+    # Load model.
+    try:
+        nlp = spacy.load("en_core_sci_sm")
+        print("[INFO] Loaded en_core_sci_sm")
+    except OSError:
+        nlp = spacy.load("en_core_web_sm")
+        print("[INFO] Loaded en_core_web_sm")
+
+    # Add UMLS linker.
+    try:
+        print("[INFO] Initializing UMLS linker...")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            nlp.add_pipe("umls_linker")
+            _linker = nlp.get_pipe("umls_linker")
+
+        print("[INFO] UMLS linker successfully initialized!")
+
+    except Exception as e:
+        print(f"[WARN] UMLS linker unavailable: {e}")
+        print("[INFO] Continuing with basic biomedical NER only")
+        _linker = None
+
+    _nlp = nlp
+    return nlp
+
+# Extract UMLS-linked biomedical concepts.
+def extract_umls_concepts(text: str) -> Dict[str, Any]:
+    if not text or not text.strip():
+        return {"concepts": [], "semantic_type_counts": {}}
+
+    nlp = _build_nlp()
+    doc = nlp(text)
+
+    concepts = []
+    semantic_types = []
+
+    global _linker
+
+    for ent in doc.ents:
+        if _linker and hasattr(ent._, "kb_ents") and ent._.kb_ents:
+            try:
+                cui, score = ent._.kb_ents[0]
+                kb_ent = _linker.kb.cui_to_entity[cui]
+                sem_types = list(kb_ent.types) if hasattr(kb_ent, 'types') and kb_ent.types else []
+
+                concepts.append({
+                    "text": ent.text,
+                    "label": ent.label_,
+                    "cui": cui,
+                    "score": float(score),
+                    "canonical_name": kb_ent.canonical_name,
+                    "semantic_types": sem_types,
+                })
+
+                semantic_types.extend(sem_types)
+
+            except (KeyError, AttributeError, IndexError):
+                pass
+        else:
+            if ent.label_:
+                concepts.append({
+                    "text": ent.text,
+                    "label": ent.label_,
+                    "cui": None,
+                    "score": 1.0,
+                    "canonical_name": ent.text,
+                    "semantic_types": [ent.label_],
+                })
+                semantic_types.append(ent.label_)
+
+    return {
+        "concepts": concepts,
+        "semantic_type_counts": dict(Counter(semantic_types)),
+    }
+
+
+# Complete UMLS Semantic Type labels.
+UMLS_SEMANTIC_TYPE_LABELS = {
+    # Organisms.
+    "T001": "Organism",
+    "T002": "Plant",
+    "T004": "Fungus",
+    "T005": "Virus",
+    "T007": "Bacterium",
+
+    # Anatomical Structures.
+    "T017": "Anatomical Structure",
+    "T021": "Fully Formed Anatomical Structure",
+    "T022": "Body System",
+    "T023": "Body Part, Organ, or Organ Component",
+    "T024": "Tissue",
+    "T025": "Cell",
+    "T026": "Cell Component",
+    "T029": "Body Location or Region",
+    "T030": "Body Space or Junction",
+
+    # Biological Function.
+    "T032": "Organism Function",
+    "T033": "Finding (Clinical findings)",
+    "T034": "Laboratory or Test Result",
+    "T037": "Injury or Poisoning",
+    "T038": "Biologic Function",
+    "T039": "Physiologic Function",
+    "T040": "Organism Function",
+    "T041": "Mental Process",
+    "T042": "Organ or Tissue Function",
+    "T043": "Cell Function",
+    "T044": "Molecular Function",
+    "T045": "Genetic Function",
+
+    # Chemicals & Drugs.
+    "T103": "Chemical",
+    "T109": "Organic Chemical",
+    "T110": "Steroid",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
+    "T116": "Amino Acid, Peptide, or Protein",
+    "T121": "Pharmacologic Substance (Drug)",
+    "T122": "Biomedical or Dental Material",
+    "T123": "Biologically Active Substance",
+    "T125": "Hormone",
+    "T126": "Enzyme",
+    "T127": "Vitamin",
+    "T129": "Immunologic Factor",
+    "T130": "Indicator, Reagent, or Diagnostic Aid",
+    "T131": "Hazardous or Poisonous Substance",
+    "T195": "Antibiotic",
+    "T196": "Element, Ion, or Isotope",
+    "T197": "Inorganic Chemical",
+    "T200": "Clinical Drug",
+
+    # Disorders.
+    "T019": "Congenital Abnormality",
+    "T020": "Acquired Abnormality",
+    "T046": "Pathologic Function",
+    "T047": "Disease or Syndrome",
+    "T048": "Mental or Behavioral Dysfunction",
+    "T049": "Cell or Molecular Dysfunction",
+    "T050": "Experimental Model of Disease",
+    "T184": "Sign or Symptom",
+    "T190": "Anatomical Abnormality",
+    "T191": "Neoplastic Process",
+
+    # Procedures.
+    "T058": "Health Care Activity",
+    "T059": "Laboratory Procedure",
+    "T060": "Diagnostic Procedure",
+    "T061": "Therapeutic or Preventive Procedure",
+
+    # Devices.
+    "T074": "Medical Device",
+    "T075": "Research Device",
+
+    # Objects.
+    "T071": "Entity",
+    "T072": "Physical Object",
+    "T073": "Manufactured Object",
+
+    # Concepts & Ideas.
+    "T077": "Conceptual Entity",
+    "T078": "Idea or Concept",
+    "T079": "Temporal Concept (Time-related)",
+    "T080": "Qualitative Concept",
+    "T081": "Quantitative Concept",
+    "T082": "Spatial Concept",
+    "T089": "Regulation or Law",
+    "T090": "Occupation or Discipline",
+    "T091": "Biomedical Occupation or Discipline",
+
+    # Activities & Behaviors.
+    "T052": "Activity",
+    "T053": "Behavior",
+    "T054": "Social Behavior",
+    "T055": "Individual Behavior",
+    "T056": "Daily or Recreational Activity",
+    "T057": "Occupational Activity",
+
+    # Organizations & Groups.
+    "T092": "Organization",
+    "T093": "Health Care Related Organization",
+    "T094": "Professional Society",
+    "T095": "Self-help or Relief Organization",
+    "T096": "Group",
+    "T097": "Professional or Occupational Group",
+    "T098": "Population Group",
+    "T099": "Family Group",
+    "T100": "Age Group",
+    "T101": "Patient or Disabled Group",
+
+    # Geographic Areas.
+    "T083": "Geographic Area",
+}
+
+# Convert UMLS semantic types to readable summary.
+def summarize_semantic_types(semantic_type_counts: Dict[str, int]) -> str:
+    if not semantic_type_counts:
+        return "not strongly associated with any specific biomedical semantic category"
+
+    sorted_types = sorted(
+        semantic_type_counts.items(), key=lambda x: x[1], reverse=True
+    )[:3]
+
+    parts = []
+    for sem_type, count in sorted_types:
+        # Get readable label, fallback to code if not found
+        label = UMLS_SEMANTIC_TYPE_LABELS.get(sem_type, sem_type)
+        parts.append(f"{label} ({count})")
+
+    if len(parts) == 1:
+        return f"primarily about {parts[0]}"
+    elif len(parts) == 2:
+        return f"largely about {parts[0]} and {parts[1]}"
+    else:
+        return f"largely about {parts[0]}, {parts[1]}, and {parts[2]}"
