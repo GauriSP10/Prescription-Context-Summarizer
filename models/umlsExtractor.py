@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 import spacy
 from spacy.language import Language
 import warnings
+import os
 
 _nlp = None
 _linker = None
@@ -31,32 +32,41 @@ def create_umls_linker(nlp, name):
 
 # Load spaCy model and add UMLS linker.
 def _build_nlp():
+    """Load spaCy model from vendor_models directory (bundled with repo)."""
     global _nlp, _linker
 
     if _nlp is not None:
         return _nlp
 
-    # Load model.
-    try:
-        nlp = spacy.load("en_core_sci_sm")
-        print("[INFO] Loaded en_core_sci_sm")
-    except OSError:
-        nlp = spacy.load("en_core_web_sm")
-        print("[INFO] Loaded en_core_web_sm")
+    # Define path to vendored model
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    VENDOR_MODEL_PATH = os.path.join(BASE_DIR, "vendor_models", "en_core_sci_sm")
 
-    # Ensure sentence boundaries exist (prevents E030 in other parts of your app)
-    if ("sentencizer" not in nlp.pipe_names) and ("parser" not in nlp.pipe_names) and ("senter" not in nlp.pipe_names):
+    # Try loading from vendor_models first
+    try:
+        if os.path.exists(VENDOR_MODEL_PATH):
+            nlp = spacy.load(VENDOR_MODEL_PATH)
+            print(f"[INFO] ✅ Loaded en_core_sci_sm from vendor_models/")
+        else:
+            # Fallback to installed model
+            nlp = spacy.load("en_core_sci_sm")
+            print("[INFO] Loaded en_core_sci_sm from system")
+    except OSError:
+        # Final fallback to web model
+        nlp = spacy.load("en_core_web_sm")
+        print("[INFO] Loaded en_core_web_sm (fallback)")
+
+    # Add sentencizer
+    if ("sentencizer" not in nlp.pipe_names) and ("parser" not in nlp.pipe_names):
         nlp.add_pipe("sentencizer", first=True)
 
-    # Add UMLS linker.
+    # Add UMLS linker
     try:
         print("[INFO] Initializing UMLS linker...")
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
 
-            # If scispaCy is installed correctly, prefer the registered factory "entity_linker".
-            # This avoids spaCy 3.x errors when trying to add custom callables.
             if "entity_linker" not in nlp.pipe_names:
                 try:
                     nlp.add_pipe(
@@ -69,14 +79,13 @@ def _build_nlp():
                     )
                     _linker = nlp.get_pipe("entity_linker")
                 except Exception:
-                    # Fall back to your custom factory if entity_linker isn't registered
                     if "umls_linker" not in nlp.pipe_names:
                         nlp.add_pipe("umls_linker")
                     _linker = nlp.get_pipe("umls_linker")
             else:
                 _linker = nlp.get_pipe("entity_linker")
 
-        print("[INFO] UMLS linker successfully initialized!")
+        print("[INFO] ✅ UMLS linker successfully initialized!")
 
     except Exception as e:
         print(f"[WARN] UMLS linker unavailable: {e}")
