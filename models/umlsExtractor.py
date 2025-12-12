@@ -12,7 +12,17 @@ _linker = None
 @Language.factory("umls_linker")
 def create_umls_linker(nlp, name):
     """Factory function to create UMLS linker component."""
-    from scispacy.linking import EntityLinker
+    # IMPORTANT:
+    # scispaCy registers the built-in component factory as "entity_linker".
+    # We keep your custom factory name, but instantiate via the supported spaCy add_pipe approach
+    # to avoid E002/E966 factory issues.
+    try:
+        import scispacy  # noqa: F401
+        from scispacy.linking import EntityLinker  # noqa: F401
+    except Exception as e:
+        raise RuntimeError(f"scispacy is not available: {e}")
+
+    # Create and return an EntityLinker instance
     return EntityLinker(
         resolve_abbreviations=True,
         name=name,
@@ -34,14 +44,37 @@ def _build_nlp():
         nlp = spacy.load("en_core_web_sm")
         print("[INFO] Loaded en_core_web_sm")
 
+    # Ensure sentence boundaries exist (prevents E030 in other parts of your app)
+    if ("sentencizer" not in nlp.pipe_names) and ("parser" not in nlp.pipe_names) and ("senter" not in nlp.pipe_names):
+        nlp.add_pipe("sentencizer", first=True)
+
     # Add UMLS linker.
     try:
         print("[INFO] Initializing UMLS linker...")
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
-            nlp.add_pipe("umls_linker")
-            _linker = nlp.get_pipe("umls_linker")
+
+            # If scispaCy is installed correctly, prefer the registered factory "entity_linker".
+            # This avoids spaCy 3.x errors when trying to add custom callables.
+            if "entity_linker" not in nlp.pipe_names:
+                try:
+                    nlp.add_pipe(
+                        "entity_linker",
+                        config={
+                            "linker_name": "umls",
+                            "resolve_abbreviations": True,
+                            "threshold": 0.7,
+                        },
+                    )
+                    _linker = nlp.get_pipe("entity_linker")
+                except Exception:
+                    # Fall back to your custom factory if entity_linker isn't registered
+                    if "umls_linker" not in nlp.pipe_names:
+                        nlp.add_pipe("umls_linker")
+                    _linker = nlp.get_pipe("umls_linker")
+            else:
+                _linker = nlp.get_pipe("entity_linker")
 
         print("[INFO] UMLS linker successfully initialized!")
 
