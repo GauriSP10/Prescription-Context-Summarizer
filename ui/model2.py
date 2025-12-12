@@ -1,17 +1,14 @@
-# ui/page_teammate.py
-
 import streamlit as st
 import time
 import sys
 import os
 
-# Add models directory to path
+# Add models directory to path.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 if MODELS_DIR not in sys.path:
     sys.path.append(MODELS_DIR)
 
-# Import partner's modules
 from models.t5TransformerModel import ClinicalNoteSummarizer
 from models.utils import get_statistics, get_example_notes
 

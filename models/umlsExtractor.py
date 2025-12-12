@@ -13,9 +13,8 @@ _linker = None
 @Language.factory("umls_linker")
 def create_umls_linker(nlp, name):
     """Factory function to create UMLS linker component."""
-    # IMPORTANT:
     # scispaCy registers the built-in component factory as "entity_linker".
-    # We keep your custom factory name, but instantiate via the supported spaCy add_pipe approach
+    # We keep our custom factory name, but instantiate via the supported spaCy add_pipe approach
     # to avoid E002/E966 factory issues.
     try:
         import scispacy  # noqa: F401
@@ -38,29 +37,29 @@ def _build_nlp():
     if _nlp is not None:
         return _nlp
 
-    # Define path to vendored model
+    # Define path to vendored model.
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     VENDOR_MODEL_PATH = os.path.join(BASE_DIR, "vendor_models", "en_core_sci_sm")
 
-    # Try loading from vendor_models first
+    # Try loading from vendor_models first.
     try:
         if os.path.exists(VENDOR_MODEL_PATH):
             nlp = spacy.load(VENDOR_MODEL_PATH)
-            print(f"[INFO] ✅ Loaded en_core_sci_sm from vendor_models/")
+            print(f"[INFO] Loaded en_core_sci_sm from vendor_models/")
         else:
-            # Fallback to installed model
+            # Fallback to installed model.
             nlp = spacy.load("en_core_sci_sm")
             print("[INFO] Loaded en_core_sci_sm from system")
     except OSError:
-        # Final fallback to web model
+        # Final fallback to web model.
         nlp = spacy.load("en_core_web_sm")
         print("[INFO] Loaded en_core_web_sm (fallback)")
 
-    # Add sentencizer
+    # Add sentencizer.
     if ("sentencizer" not in nlp.pipe_names) and ("parser" not in nlp.pipe_names):
         nlp.add_pipe("sentencizer", first=True)
 
-    # Add UMLS linker
+    # Add UMLS linker.
     try:
         print("[INFO] Initializing UMLS linker...")
 
@@ -85,7 +84,7 @@ def _build_nlp():
             else:
                 _linker = nlp.get_pipe("entity_linker")
 
-        print("[INFO] ✅ UMLS linker successfully initialized!")
+        print("[INFO] UMLS linker successfully initialized!")
 
     except Exception as e:
         print(f"[WARN] UMLS linker unavailable: {e}")
@@ -110,7 +109,7 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
     global _linker
 
     for ent in doc.ents:
-        # Skip generic ENTITY labels - they're not informative
+        # Skip generic ENTITY labels because they're not informative.
         if ent.label_ == "ENTITY":
             continue
 
@@ -134,7 +133,7 @@ def extract_umls_concepts(text: str) -> Dict[str, Any]:
             except (KeyError, AttributeError, IndexError):
                 pass
         else:
-            # Only add if it has a meaningful label
+            # Only add if it has a meaningful label.
             if ent.label_ and ent.label_ != "ENTITY":
                 concepts.append({
                     "text": ent.text,
@@ -271,7 +270,7 @@ UMLS_SEMANTIC_TYPE_LABELS = {
 # Convert UMLS semantic types to readable summary.
 def summarize_semantic_types(semantic_type_counts: Dict[str, int]) -> str:
     """Convert UMLS semantic types to readable summary."""
-    # Filter out ENTITY labels
+    # Filter out ENTITY labels.
     filtered_counts = {k: v for k, v in semantic_type_counts.items() if k != "ENTITY"}
 
     if not filtered_counts:

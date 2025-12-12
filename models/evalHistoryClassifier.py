@@ -1,150 +1,140 @@
 import os
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
 import joblib
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import (
-    classification_report,
     f1_score,
-    accuracy_score,
     jaccard_score,
     hamming_loss,
+    precision_recall_fscore_support,
 )
 
-# ---------------- CONFIG: EDIT THESE IF NEEDED ---------------- #
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.getenv("DATA_DIR", os.path.join(PROJECT_ROOT, "data"))
+def _load_dataset_csv(data_path: str) -> Tuple[List[str], List[List[str]]]:
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Dataset not found: {data_path}")
 
-# Change this if your CSV has a different name/path
-DATA_PATH = os.path.join(DATA_DIR, "nbme_summarization_dataset.csv")
+    df = pd.read_csv(data_path)
+    if "note_text" not in df.columns or "summary" not in df.columns:
+        raise ValueError("Dataset must contain columns: 'note_text' and 'summary'")
 
-MODEL_DIR = os.path.join(PROJECT_ROOT, "models")
-MODEL_PATH = os.path.join(MODEL_DIR, "history_classifier.joblib")
-MLB_PATH = os.path.join(MODEL_DIR, "history_labels_mlb.joblib")
-
-TOP_K_LABELS = 20  # for “top-K labels” metrics
-
-# -------------------------------------------------------------- #
-
-
-def load_data():
-    print("[INFO] Reading data from:", DATA_PATH)
-    if not os.path.exists(DATA_PATH):
-        raise FileNotFoundError(f"Could not find dataset at {DATA_PATH}")
-
-    df = pd.read_csv(DATA_PATH)
-    # adjust these column names if yours differ
     df["note_text"] = df["note_text"].astype(str)
     df["summary"] = df["summary"].astype(str)
 
     texts = df["note_text"].tolist()
-    label_sets = df["summary"].apply(
-        lambda s: [x.strip() for x in s.split(";") if x.strip()]
-    ).tolist()
+    label_sets = df["summary"].apply(lambda s: [x.strip() for x in s.split(";") if x.strip()]).tolist()
     return texts, label_sets
 
 
-def compute_metrics(y_true, y_pred, label=""):
+def _stack_proba(prob_list) -> np.ndarray:
+    # If OneVsRest gives list of (n_samples,2) probs per label
+    if isinstance(prob_list, list):
+        return np.vstack([p[:, 1] for p in prob_list]).T
+    return prob_list  # already (n_samples, n_labels)
+
+
+def _compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     micro = f1_score(y_true, y_pred, average="micro", zero_division=0)
     macro = f1_score(y_true, y_pred, average="macro", zero_division=0)
-    subset_acc = accuracy_score(y_true, y_pred)
-    jacc = jaccard_score(y_true, y_pred, average="samples")
-    hamm = 1 - hamming_loss(y_true, y_pred)
-
-    print(f"\n=== {label} ===")
-    print(f"Subset accuracy: {subset_acc:.3f}")
-    print(f"Micro F1:        {micro:.3f}")
-    print(f"Macro F1:        {macro:.3f}")
-    print(f"Jaccard Accuracy:{jacc:.3f}")
-    print(f"Hamming Score:   {hamm:.3f}")
+    jacc = jaccard_score(y_true, y_pred, average="samples", zero_division=0)
+    hamm = 1 - hamming_loss(y_true, y_pred)  # per-label "accuracy-ish"
 
     return {
-        "micro": micro,
-        "macro": macro,
-        "subset": subset_acc,
-        "jacc": jacc,
-        "hamm": hamm,
+        "micro_f1": float(micro),
+        "macro_f1": float(macro),
+        "jaccard": float(jacc),
+        "hamming_score": float(hamm),
     }
 
 
-if __name__ == "__main__":
-    # 1) Load data & model
-    texts, label_sets = load_data()
-    clf = joblib.load(MODEL_PATH)
-    mlb: MultiLabelBinarizer = joblib.load(MLB_PATH)
+def _label_cooccurrence(Y: np.ndarray, max_labels: int = 30) -> Tuple[np.ndarray, List[int]]:
+    """
+    Returns co-occurrence matrix for top-N labels by frequency.
+    """
+    freq = Y.sum(axis=0)
+    top_idx = np.argsort(freq)[::-1][:max_labels]
+    Yt = Y[:, top_idx]
+    cooc = (Yt.T @ Yt).astype(int)
+    return cooc, top_idx.tolist()
+
+
+def evaluate_history_classifier(
+    data_path: str,
+    model_path: str,
+    mlb_path: str,
+    threshold: float = 0.30,
+    sweep: bool = True,
+    sweep_step: float = 0.05,
+    test_size: float = 0.10,
+    random_state: int = 42,
+    top_labels_for_heatmap: int = 30,
+) -> Dict[str, Any]:
+    # Load dataset
+    texts, label_sets = _load_dataset_csv(data_path)
+
+    # Load artifacts
+    clf = joblib.load(model_path)
+    mlb = joblib.load(mlb_path)
 
     Y = mlb.transform(label_sets)
 
     X_train, X_val, Y_train, Y_val = train_test_split(
-        texts, Y, test_size=0.1, random_state=42
+        texts, Y, test_size=test_size, random_state=random_state
     )
 
-    # 2) Baseline: current predict()
-    print("\n[BASELINE] Using clf.predict (default threshold ~0.5)")
-    Y_pred_default = clf.predict(X_val)
-    baseline = compute_metrics(Y_val, Y_pred_default, label="Baseline (default)")
+    if not hasattr(clf, "predict_proba"):
+        raise RuntimeError("Model must support predict_proba for thresholding + eval.")
 
-    # 3) Threshold tuning to improve Micro F1 / Jaccard
-    print("\n[THRESHOLD TUNING] Using predict_proba and sweeping thresholds...")
-    # pipeline predict_proba returns list of arrays (one per label); stack them
-    prob_list = clf.predict_proba(X_val)
-    # prob_list is usually a list length = n_labels, each shape (n_samples, 2)
-    # we take probability of class 1 from each
-    if isinstance(prob_list, list):
-        # shape -> (n_samples, n_labels)
-        Y_proba = np.vstack([p[:, 1] for p in prob_list]).T
-    else:
-        # some pipelines may return directly (n_samples, n_labels)
-        Y_proba = prob_list
+    proba_list = clf.predict_proba(X_val)
+    Y_proba = _stack_proba(proba_list)
+    Y_pred = (Y_proba >= threshold).astype(int)
 
-    best = None  # (micro, jacc, th, macro, hamm, subset)
+    metrics_at_threshold = _compute_metrics(Y_val, Y_pred)
 
-    for t in [i / 100 for i in range(5, 90, 5)]:  # 0.05, 0.10, ..., 0.85
-        Y_pred_t = (Y_proba >= t).astype(int)
-        micro = f1_score(Y_val, Y_pred_t, average="micro", zero_division=0)
-        macro = f1_score(Y_val, Y_pred_t, average="macro", zero_division=0)
-        subset_acc = accuracy_score(Y_val, Y_pred_t)
-        jacc = jaccard_score(Y_val, Y_pred_t, average="samples")
-        hamm = 1 - hamming_loss(Y_val, Y_pred_t)
+    # Threshold sweep
+    threshold_sweep = []
+    if sweep:
+        for t in np.arange(0.05, 0.90, sweep_step):
+            pred_t = (Y_proba >= t).astype(int)
+            m = _compute_metrics(Y_val, pred_t)
+            m["threshold"] = float(round(float(t), 2))
+            threshold_sweep.append(m)
 
-        print(
-            f"th={t:.2f} -> micro F1={micro:.3f}, macro F1={macro:.3f}, "
-            f"Jaccard={jacc:.3f}, Hamming={hamm:.3f}, subset={subset_acc:.3f}"
+    # Per-label stats
+    labels = list(mlb.classes_)
+    label_counts = Y_train.sum(axis=0)
+
+    prec, rec, f1, sup = precision_recall_fscore_support(
+        Y_val, Y_pred, average=None, zero_division=0
+    )
+
+    label_stats = []
+    for i, name in enumerate(labels):
+        label_stats.append(
+            {
+                "label": name,
+                "train_freq": int(label_counts[i]),
+                "support_val": int(sup[i]),
+                "precision": float(prec[i]),
+                "recall": float(rec[i]),
+                "f1": float(f1[i]),
+            }
         )
 
-        if best is None or micro > best[0]:
-            best = (micro, jacc, t, macro, hamm, subset_acc)
+    label_stats.sort(key=lambda d: d["train_freq"], reverse=True)
 
-    print("\n=== Best threshold by Micro F1 (ALL labels) ===")
-    print(
-        f"Best threshold: {best[2]:.2f}\n"
-        f"Micro F1:       {best[0]:.3f}\n"
-        f"Macro F1:       {best[3]:.3f}\n"
-        f"Jaccard:        {best[1]:.3f}\n"
-        f"Hamming:        {best[4]:.3f}\n"
-        f"Subset Acc:     {best[5]:.3f}"
-    )
+    # Co-occurrence heatmap data
+    cooc, top_idx = _label_cooccurrence(Y_train, max_labels=top_labels_for_heatmap)
+    heatmap_labels = [labels[i] for i in top_idx]
 
-    # 4) Metrics on TOP-K most frequent labels (this will look MUCH better)
-    print(f"\n[TOP-{TOP_K_LABELS} LABELS] Evaluating on most frequent labels only...")
-
-    label_counts = Y_train.sum(axis=0)  # frequency per label
-    top_k_indices = np.argsort(label_counts)[::-1][:TOP_K_LABELS]
-
-    Y_val_top = Y_val[:, top_k_indices]
-    Y_pred_best = (Y_proba >= best[2]).astype(int)
-    Y_pred_top = Y_pred_best[:, top_k_indices]
-
-    top_metrics = compute_metrics(
-        Y_val_top, Y_pred_top, label=f"Top {TOP_K_LABELS} labels (best threshold)"
-    )
-
-    print("\n[NOTE]")
-    print(
-        "Use Hamming Score as your main 'accuracy' (per-label accuracy), "
-        "and you can optionally report the much higher Micro F1 / Jaccard "
-        f"on the top {TOP_K_LABELS} most frequent labels."
-    )
+    return {
+        "metrics_at_threshold": metrics_at_threshold,
+        "threshold_sweep": threshold_sweep,
+        "label_stats": label_stats,
+        "cooc_matrix": cooc,
+        "cooc_labels": heatmap_labels,
+    }
