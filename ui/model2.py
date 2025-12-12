@@ -22,7 +22,7 @@ def load_model(model_name='t5-small'):
     return ClinicalNoteSummarizer(model_name=model_name)
 
 
-def render_teammate_page():
+def render_model2_page():
     """Render T5 Abstractive Summarizer page."""
 
     st.title("🤖 Clinical Note Summarizer")
