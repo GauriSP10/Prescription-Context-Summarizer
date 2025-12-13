@@ -6,10 +6,10 @@ Two ways to run:
 2) Pre-defined inputs (predefined mode)
 
 Examples:
-  python demo.py --mode interactive
-  python demo.py --mode predefined
-  python demo.py --mode predefined --example 2
-  python demo.py --mode interactive --threshold 0.30 --top_k 8
+  python demo1.py --mode interactive
+  python demo1.py --mode predefined
+  python demo1.py --mode predefined --example 2
+  python demo1.py --mode interactive --threshold 0.30 --top_k 8
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ def _try_import_pipeline():
     Input: None | Output: correlate_history_and_prescription (callable) or raises ImportError
     """
     """
-    Robust import so demo.py can be run from project root.
+    Robust import so demo1.py can be run from project root.
     Tries:
-      - direct import (if demo.py sits alongside correlationPipeline.py)
-      - import from models/ (common structure in your repo)
+      - direct import (if demo1.py sits alongside correlationPipeline.py)
+      - import from models/ (common structure in the repo)
     """
     # 1) Direct import
     try:
@@ -51,7 +51,7 @@ def _try_import_pipeline():
     except Exception as e:
         raise ImportError(
             "Could not import correlate_history_and_prescription from correlationPipeline.py.\n"
-            "Make sure demo.py is in the project root and correlationPipeline.py is either:\n"
+            "Make sure demo1.py is in the project root and correlationPipeline.py is either:\n"
             "  - in the same directory, or\n"
             "  - inside ./models/\n\n"
             f"Original import error: {e}"
